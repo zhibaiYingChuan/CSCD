@@ -1,0 +1,47 @@
+# C-S-C-D 程序级混合方案配置
+# 管理级联压缩比、递归轮次、触发阈值，便于实验调优（无需改代码）。
+
+# 递归级联压缩比表：键=递归轮次(从1开始)，值=该轮 COMBINE 压缩比
+# 越深层对上层摘要依赖越强，压缩比递减（保留更少、更精炼）
+compress_ratios:
+  round_1: 0.6
+  round_2: 0.5
+  round_3: 0.4
+  round_default: 0.4   # 超过已配置轮次时使用的默认比
+
+# 每阶段内嵌压缩比（协议层提示用，仅作建议，非运行时强制）
+stage_ratios:
+  DECOMPOSE: 0.6
+  CLASSIFY: 0.5
+  SELECT: 0.7
+  COMBINE: 0.4
+
+# 主循环控制
+max_rounds: 3            # 递归轮次硬上限（防无限递归，永远不低于下方动态值）
+
+# 阶段C：按任务复杂度动态调节递归轮次（优化净成本）
+# simple 任务不递归（max_rounds=1，净省 Token）；complex 才多轮深挖。
+# 最终轮次 = min(rounds_by_complexity[复杂度], max_rounds)
+rounds_by_complexity:
+  simple: 1
+  medium: 2
+  complex: 3
+
+budget_per_round: 2048   # 每轮模型调用 max_tokens
+temperature: 0.3
+
+# 早停：连续两轮 COMBINE 摘要一致时终止
+early_stop_on_stable: true
+
+# 方向Y：simple 任务短路走基线直答（净成本=基线，不产生协议骨架开销）
+# 仅对 simple 且无非可信输入的任务生效；medium/complex 仍走协议+缓存
+simple_shortcut_to_baseline: true
+
+# tiktoken 计量（None 时降级字符/1.6 近似）
+tokenizer: "cl100k_base"
+
+# ===== 推理时认知控制层（J-Space/dsh 补全，2026-08-18）=====
+# 编排层(CSCD 四阶)之外的推理时认知控制：约束模型"能激活什么/如何记录推理状态/如何响应置信度"。
+cognitive_control: true          # 总开关：注入工作空间/稠密轨/桥接/元认知指令
+trajectory_anchoring: true       # dsh 首轮轨迹锚定：首轮只暴露极简工具白名单，晋升后解锁完整工具
+runtime_ledger: true             # P4 运行时状态外化账本：把每轮认知状态/轨迹/交付物落盘到 .cscd/ledger/，支持 resume

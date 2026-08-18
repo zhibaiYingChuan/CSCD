@@ -1,0 +1,45 @@
+# Python 运行时缓存
+__pycache__/
+*.py[cod]
+*.pyo
+
+# CSCD 运行时数据（账本、日志、用量）
+.cscd/
+webui/backend/data/
+
+# 实验数据 *.jsonl
+*.jsonl
+
+# 独立验证脚本（非产品）
+verify_*.py
+_verify_*.py
+
+# 独立运行脚本（非产品）
+run_ab_call.py
+run_compare.py
+run_compare_bug.py
+run_defect_probe.py
+run_local.py
+run_path_compare.py
+run_verify_native.py
+
+# 对照实验脚本
+pathA_standard.py
+pathB_cscd.py
+
+# 基准日志
+bench_log.py
+
+# 任务输入文件
+_task_complex.txt
+_task_defect_probe.txt
+
+# 编码错误残留文件
+启动
+
+# VSCode 本地设置
+.vscode/
+
+# 系统隐藏文件
+Thumbs.db
+.DS_Store

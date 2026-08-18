@@ -1,0 +1,41 @@
+{
+  "name": "cscd-reasoning",
+  "displayName": "C-S-C-D Reasoning",
+  "description": "在 VS Code 中通过 C-S-C-D 结构化推理协议执行推理，查看四阶轨迹、认知控制与效果看板。",
+  "version": "0.1.0",
+  "publisher": "cscd",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cscd.runReason",
+        "title": "C-S-C-D: 运行推理",
+        "category": "CSCD"
+      },
+      {
+        "command": "cscd.openDashboard",
+        "title": "C-S-C-D: 打开效果看板",
+        "category": "CSCD"
+      }
+    ],
+    "configuration": {
+      "title": "C-S-C-D",
+      "properties": {
+        "cscd.reasonApiUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8000/api/reason",
+          "description": "C-S-C-D 推理后端 API 地址（WebUI 后端）"
+        },
+        "cscd.dashboardUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8000",
+          "description": "C-S-C-D 效果看板地址"
+        }
+      }
+    }
+  }
+}

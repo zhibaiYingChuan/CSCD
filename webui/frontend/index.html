@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>C-S-C-D 部署与效果看板</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%234f8cff'/><text x='8' y='12' font-size='10' text-anchor='middle' fill='white' font-family='monospace' font-weight='bold'>C</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">C-S-C-D</span>
+      <span class="brand-sub">结构化推理协议 · 部署配置与效果看板</span>
+    </div>
+    <div class="topbar-actions">
+      <span id="service-badge" class="badge badge-pending">检测服务状态…</span>
+      <button id="theme-toggle" class="btn btn-ghost" title="切换主题">🌙 深色</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- ===== 一句话定位 ===== -->
+    <section class="hero">
+      <h1>C-S-C-D：部署指南 + 效果看板</h1>
+      <p class="hero-sub">本页面无需输入任何内容。复制配置到你的工具即可完成部署，或向下滚动查看真实效果数据。</p>
+    </section>
+
+    <!-- ===== 一、部署配置区 ===== -->
+    <section class="card deploy-card">
+      <h2>① 部署配置（一键复制）</h2>
+      <div class="deploy-tabs">
+        <button class="tab-btn active" data-tab="mcp-json">MCP 配置 JSON</button>
+        <button class="tab-btn" data-tab="env">环境变量</button>
+        <button class="tab-btn" data-tab="cmd">启动命令</button>
+      </div>
+
+      <div class="tab-pane active" id="tab-mcp-json">
+        <p class="pane-desc">复制到你的 MCP 客户端配置（Continue 的 <code>mcp.json</code> / Cline 的 <code>cline_mcp_settings.json</code> / Claude Desktop）。</p>
+        <div class="code-wrap">
+          <pre id="code-mcp"><code>{
+  "mcpServers": {
+    "cscd-protocol": {
+      "command": "python",
+      "args": ["cscd_mcp_server.py"],
+      "cwd": "${workspaceFolder}/cscd",
+      "env": {
+        "LLM_API_URL": "${env:LLM_API_URL}",
+        "LLM_API_KEY": "${env:LLM_API_KEY}",
+        "LLM_MODEL": "${env:LLM_MODEL}"
+      }
+    }
+  }
+}</code></pre>
+          <button class="btn btn-primary copy-btn" data-target="code-mcp">复制</button>
+        </div>
+      </div>
+
+      <div class="tab-pane" id="tab-env">
+        <p class="pane-desc">设置模型端点环境变量（任一组已配置即自动采用，与你的 AI 工具中已配置的 Key 一致）。</p>
+        <div class="code-wrap">
+          <pre id="code-env"><code># 与你的 AI 工具共用同一个 Key 与模型，按需填写（不预设任何具体模型/端点）
+export LLM_API_URL="https://你的模型服务地址"
+export LLM_API_KEY="你的Key"
+export LLM_MODEL="你的模型名"      # 如 gpt-4o / claude-... / deepseek-chat / 本地模型
+
+# 或使用 OPENAI_*（OpenAI 兼容端点）
+export OPENAI_BASE_URL="https://你的模型服务地址"
+export OPENAI_API_KEY="你的Key"
+export OPENAI_MODEL="你的模型名"</code></pre>
+          <button class="btn btn-primary copy-btn" data-target="code-env">复制</button>
+        </div>
+      </div>
+
+      <div class="tab-pane" id="tab-cmd">
+        <p class="pane-desc">一键启动（推荐）：在 CSCD 仓库根目录执行。</p>
+        <div class="code-wrap">
+          <pre id="code-cmd"><code># 在 CSCD 仓库根目录（含 start_services.py 的目录）
+python start_services.py            # 检查依赖 + 端点就绪 + 接入指引
+python start_services.py --all      # 一键启动 WebUI(8000) + REST API(8001)
+
+# 打开看板
+# http://127.0.0.1:8000</code></pre>
+          <button class="btn btn-primary copy-btn" data-target="code-cmd">复制</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 二、效果展示区 ===== -->
+    <section class="card metrics-card">
+      <h2>② 效果展示（预设真实测试数据）</h2>
+
+      <!-- 数字卡片：Token 节省 -->
+      <div class="metric-row">
+        <div class="metric-card">
+          <div class="metric-value" id="m-token-save">70%</div>
+          <div class="metric-label">终端输出削减</div>
+          <div class="metric-note">替代式压缩 · 最终回传仅为全量的 ~30%</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value" id="m-cache">1 次</div>
+          <div class="metric-label">缓存命中</div>
+          <div class="metric-note">单原子缓存 · 真实 recursive 任务</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value" id="m-defects">7 / 5</div>
+          <div class="metric-label">缺陷发现（协议/基线）</div>
+          <div class="metric-note">缺陷排查测试 · 协议版更全面</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value" id="m-marks">100%</div>
+          <div class="metric-label">四阶轨迹合规</div>
+          <div class="metric-note">容错解析后 marks_valid=true</div>
+        </div>
+      </div>
+
+      <!-- 缓存命中率进度条 -->
+      <div class="bar-block">
+        <h3>缓存命中率（真实 recursive 任务）</h3>
+        <div class="bar-track"><div class="bar-fill" style="width: 33%">33%</div></div>
+        <p class="bar-note">3 轮递归中 1 轮命中单原子缓存，避免重复生成</p>
+      </div>
+    </section>
+
+    <!-- ===== 精准度对比 ===== -->
+    <section class="card compare-card">
+      <h2>精准度对比（缺陷排查测试 · 真实模型）</h2>
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>缺陷项</th>
+            <th>基线（无协议）</th>
+            <th>C-S-C-D 协议</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>并发安全（事务/乐观锁）</td><td>✓ 识别</td><td>✓ 识别 + 修正方案</td></tr>
+          <tr><td>过期逻辑失败恢复</td><td>✓ 识别</td><td>✓ 识别 + 软删除/对账方案</td></tr>
+          <tr><td>防刷不充分</td><td>✓ 识别</td><td>✓ 识别 + 用户维度频控</td></tr>
+          <tr><td>精度溢出</td><td>✓ 识别</td><td>✓ 识别 + BIGINT/DECIMAL</td></tr>
+          <tr><td>查询一致性（漂移）</td><td>✓ 识别</td><td>✓ 识别 + ledger 真值源</td></tr>
+          <tr><td>索引缺失 / 时间边界</td><td class="cell-miss">✗ 未识别</td><td>✓ 补充识别（F/G）</td></tr>
+        </tbody>
+      </table>
+      <p class="compare-note">协议版通过四阶递归拆解，额外发现索引缺失、时间边界等 2 个隐患（基线未识别）。</p>
+    </section>
+
+    <!-- ===== 推理轨迹示例 ===== -->
+    <section class="card trace-card">
+      <h2>推理轨迹示例（一次完整四阶递归）</h2>
+      <div class="trace-summary">
+        <span class="badge-tag complex">complex</span>
+        <span class="badge-tag ok">marks_valid=true</span>
+        <span class="badge-tag">3 轮递归</span>
+        <span class="badge-tag ok">缓存命中 1</span>
+      </div>
+      <details class="trace-details" open>
+        <summary>点击展开完整四阶轨迹（真实模型输出）</summary>
+        <pre class="trace-pre" id="trace-sample"></pre>
+      </details>
+    </section>
+  </main>
+
+  <!-- 复制提示 -->
+  <div id="toast" class="toast hidden">已复制到剪贴板</div>
+
+  <script src="app.js"></script>
+</body>
+</html>

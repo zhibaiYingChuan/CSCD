@@ -1,0 +1,4 @@
+{
+  "task": "微服务订单系统偶现Bug排查：下单成功库存扣减正常，但支付回调偶发延迟3-5分钟，订单卡在PAYING_PENDING。线索：1)延迟时PaymentClient retry_count普遍为3；2)高峰期偶发ConnectionTimeout但很快恢复；3)支付网关文档更新提到异步通知重试幂等性校验；4)重启OrderService后延迟短暂消失30分钟；5)InventoryClient用@Transactional(REQUIRES_NEW)。要求深度推理根因并给修复方案。",
+  "answer": "根因：支付网关新版本增加了异步通知重试的幂等性校验，但本系统PaymentClient的重试逻辑未携带稳定幂等键（如order_id+retry_seq），导致网关侧对第2、3次重试判定为重复而静默丢弃，PaymentClient在retry_count达到3后放弃，订单卡在PAYING_PENDING。所谓3-5分钟延迟实为重试退避耗尽后的超时暴露。\n\n噪音排除：2)ConnectionTimeout偶发且自愈，与稳定复现的卡单无关；5)InventoryClient的事务传播只影响库存一致性，库存已确认正常扣减，故排除；4)重启短暂消失是因连接冷启动使重试时序变化，属巧合而非根因。1)retry_count=3是表象，恰好印证重试耗尽。3)才是触发点。\n\n修复：重试携带稳定幂等键；PaymentClient增加针对网关幂等校验的兼容；将固定3次重试改为基于回调确认的退避，并对PAYING_PENDING加定时对账补偿任务。伪代码：retry(req.withIdempotencyKey(orderId+seq)); scheduleReconcile(orderId, PAYING_PENDING, 60s)."
+}

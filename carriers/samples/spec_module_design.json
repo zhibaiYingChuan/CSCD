@@ -1,0 +1,5 @@
+{
+  "task": "为 C-S-C-D 通用推理编排系统设计模块划分与接口契约，要求模型无关、可插拔执行载体",
+  "anchor": "这是一个元设计任务：为 C-S-C-D 协议本身设计软件结构。核心约束两条：(1) 协议层与载体层分离；(2) 载体可插拔。",
+  "reason": "<DECOMPOSE>\n1. 协议层需要什么产出？（四阶标记语言规范）\n2. 载体层需要什么抽象接口？（统一运行时契约）\n3. 载体如何注册/发现？（插件机制）\n4. 跨载体如何保证四阶语义一致？（标记校验）\n5. 如何计量与对比效果？（bench 日志）\n6. 失败/超时如何恢复？（元认知失效恢复）\n</DECOMPOSE>\n<CLASSIFY>\n- 事实：协议层 = protocol.md；载体层 = 实现 run() 的运行时；已有 orchestrator.py(OpenAI兼容) 与 CodeBuddy 会话两种载体\n- 事实：载体需暴露统一入口 run(question, model, carrier_config) -> result\n- 假设：用标记校验器能保证跨载体语义一致\n- 假设：插件机制用注册表（dict）即可，无需重型框架\n- 噪音：可插拔是泛词，需落地为具体接口而非口号\n</CLASSIFY>\n<SELECT>\n1. 协议层 = protocol.md（语义契约源）\n2. 载体统一入口 run(question, model, carrier_config)\n3. 已有两种载体实现可作参照\n</SELECT>\n<COMBINE>\n事实1+2 与 假设1 碰撞 -> 推出：需一个载体适配接口 Carrier，所有运行时实现它，协议层只依赖该接口，不依赖具体载体。这满足模型/载体无关。\n产生新子目标：Carrier 接口具体方法签名是什么？ -> 拆为 anchor()、reason()、validate_marks() 三个原子。\n</COMBINE>"
+}

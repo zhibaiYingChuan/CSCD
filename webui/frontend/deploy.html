@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>C-S-C-D 部署向导</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%234f8cff'/><text x='8' y='12' font-size='10' text-anchor='middle' fill='white' font-family='monospace' font-weight='bold'>C</text></svg>">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .steps { counter-reset: step; display: flex; flex-direction: column; gap: 16px; }
+    .step {
+      background: var(--code-bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px; position: relative; padding-left: 52px;
+    }
+    .step::before {
+      counter-increment: step; content: counter(step);
+      position: absolute; left: 14px; top: 16px;
+      width: 26px; height: 26px; border-radius: 50%;
+      background: var(--accent); color: #fff; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .step h3 { margin-bottom: 6px; font-size: 14px; }
+    .step p { color: var(--text-dim); font-size: 13px; margin-bottom: 8px; }
+    .step .status { font-size: 13px; font-weight: 600; }
+    .status-ok { color: var(--success); }
+    .status-warn { color: var(--warn); }
+    .status-err { color: var(--danger); }
+    .form-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 13px; color: var(--text-dim); }
+    .form-field input {
+      background: var(--code-bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 13px;
+    }
+    .inline-code {
+      background: var(--bg); padding: 1px 6px; border-radius: 4px;
+      font-family: "SF Mono", Consolas, monospace; font-size: 12px;
+    }
+    .copy-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .copy-row .btn { flex-shrink: 0; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">C-S-C-D</span>
+      <span class="brand-sub">部署向导</span>
+    </div>
+    <div class="topbar-actions">
+      <span id="service-badge" class="badge badge-pending">检测服务状态…</span>
+      <button id="theme-toggle" class="btn btn-ghost" title="切换主题">🌙 深色</button>
+    </div>
+  </header>
+
+  <main class="layout" style="max-width: 820px;">
+    <section class="hero">
+      <h1>C-S-C-D 可视化部署向导</h1>
+      <p class="hero-sub">从仓库下载后，按以下步骤即可完成部署。无需逐个文件执行命令——多数步骤会自动检测或一键完成。</p>
+    </section>
+
+    <section class="card">
+      <div class="steps">
+
+        <!-- Step 1: Python -->
+        <div class="step">
+          <h3>确认 Python 环境</h3>
+          <p>需要 Python 3.10+（已安装则自动跳过依赖安装）。</p>
+          <div class="status" id="py-status">检测中…</div>
+        </div>
+
+        <!-- Step 2: 模型端点 -->
+        <div class="step">
+          <h3>配置模型端点</h3>
+          <p>已配置的端点会自动检测并填充。若未配置，请填写你的 OpenAI 兼容端点（与你的 AI 工具共用同一个 Key）。</p>
+          <div id="endpoint-form">
+            <div class="form-field">
+              <span>API 地址 (base_url)</span>
+              <input id="inp-url" placeholder="https://你的模型服务地址">
+            </div>
+            <div class="form-field">
+              <span>API Key</span>
+              <input id="inp-key" placeholder="你的Key">
+            </div>
+            <div class="form-field">
+              <span>模型名</span>
+              <input id="inp-model" placeholder="gpt-4o / claude-... / deepseek-chat / 本地模型">
+            </div>
+            <div class="copy-row">
+              <button id="btn-gen-env" class="btn btn-primary">生成并复制启动配置</button>
+              <button id="btn-copy-env" class="btn btn-ghost">复制命令</button>
+            </div>
+          </div>
+          <pre id="generated-env" style="margin-top:10px;display:none" class="trace-pre"></pre>
+        </div>
+
+        <!-- Step 3: 启动服务 -->
+        <div class="step">
+          <h3>启动服务</h3>
+          <p>一键启动 WebUI 看板 (8000) 与 REST API (8001)。</p>
+          <div class="copy-row">
+            <span class="inline-code">python start_services.py --all</span>
+            <button id="btn-copy-cmd" class="btn btn-ghost">复制</button>
+          </div>
+          <p style="margin-top:8px">Windows 也可直接<span class="inline-code">双击 start.bat</span>，自动完成"装依赖 + 启动 + 打开浏览器"。</p>
+          <div class="status" id="svc-status">检测中…</div>
+        </div>
+
+        <!-- Step 4: 打开看板 -->
+        <div class="step">
+          <h3>打开看板</h3>
+          <p>部署完成后，打开部署配置面板 + 效果展示看板。</p>
+          <div class="copy-row">
+            <span class="inline-code">http://127.0.0.1:8000</span>
+            <button id="btn-open" class="btn btn-primary">打开看板</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden">已复制到剪贴板</div>
+  <script src="app.js"></script>
+  <script>
+    (function () {
+      const $ = (s) => document.querySelector(s);
+      function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.remove("hidden"); setTimeout(()=>t.classList.add("hidden"),1600); }
+
+      /* 安全地设置带 span 样式的状态文本（替代 innerHTML） */
+      function setStatus(el, className, text) {
+        el.textContent = '';
+        const s = document.createElement('span');
+        s.className = className;
+        s.textContent = text;
+        el.appendChild(s);
+      }
+
+      /* 检测 Python（尝试请求后端，能通说明服务已启动；否则提示） */
+      function checkEnv() {
+        fetch("/api/status").then(r=>r.ok?r.json():Promise.reject())
+          .then(d=>{
+            setStatus($("#py-status"), 'status-ok', '● Python 环境可用（后端服务已运行）');
+            setStatus($("#svc-status"), 'status-ok', '● 服务已就绪 · ' + (d.model||''));
+            setBadge("ok", "● 服务就绪 · " + (d.model||""));
+            if (d.base_url) $("#inp-url").value = d.base_url;
+            if (d.model) $("#inp-model").value = d.model;
+          })
+          .catch(()=>{
+            setStatus($("#py-status"), 'status-warn', '● 服务未启动（尚未检测到后端）。请先执行下方"启动服务"步骤。');
+            setStatus($("#svc-status"), 'status-warn', '● 未启动');
+            setBadge("error", "● 后端未启动");
+          });
+      }
+      function setBadge(t, txt){ const b=$("#service-badge"); b.className="badge badge-"+t; b.textContent=txt; }
+
+      /* 生成环境变量命令（返回 real 用于剪贴板，display 用于 DOM 显示） */
+      function buildEnvCmd(){
+        const u=$("#inp-url").value.trim(), k=$("#inp-key").value.trim(), m=$("#inp-model").value.trim();
+        if(!u||!k||!m){ toast("请先填写完整的端点、Key 与模型名"); return null; }
+        const real = "set LLM_API_URL="+u+"\nset LLM_API_KEY="+k+"\nset LLM_MODEL="+m+"\npython start_services.py --all";
+        const display = "set LLM_API_URL="+u+"\nset LLM_API_KEY=****"+"\nset LLM_MODEL="+m+"\npython start_services.py --all";
+        return { real, display };
+      }
+      $("#btn-gen-env").addEventListener("click", ()=>{
+        const cmd = buildEnvCmd(); if(!cmd) return;
+        $("#generated-env").style.display="block";
+        $("#generated-env").textContent = cmd.display;
+        navigator.clipboard.writeText(cmd.real).then(()=>toast("已生成并复制启动命令"));
+      });
+      $("#btn-copy-env").addEventListener("click", ()=>{
+        const cmd = buildEnvCmd(); if(!cmd) return;
+        navigator.clipboard.writeText(cmd.real).then(()=>toast("已复制"));
+      });
+      $("#btn-copy-cmd").addEventListener("click", ()=>{
+        navigator.clipboard.writeText("python start_services.py --all").then(()=>toast("已复制"));
+      });
+      $("#btn-open").addEventListener("click", ()=>{ window.open("http://127.0.0.1:8000", "_blank"); });
+
+      checkEnv();
+      setInterval(checkEnv, 10000);
+    })();
+  </script>
+</body>
+</html>

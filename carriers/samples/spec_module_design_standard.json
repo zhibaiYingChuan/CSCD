@@ -1,0 +1,4 @@
+{
+  "task": "为 C-S-C-D 通用推理编排系统设计模块划分与接口契约，要求模型无关、可插拔执行载体",
+  "answer": "建议模块划分：\n1. protocol.md 定义四阶标记语言（DECOMPOSE/CLASSIFY/SELECT/COMBINE）作为语义契约。\n2. core/ 协议层：classify（任务分类）、assess（复杂度评估）、marks（标记校验）、cscd（四阶递归主循环）。\n3. carriers/ 载体层：base.py 定义 Carrier 抽象接口（anchor/reason/validate_marks），openai_carrier 与 codebuddy_carrier 各自实现，可插拔。\n4. bench_log.py 做 Token/延迟基线对比。\n5. orchestrator.py 入口，默认选 openai_carrier。\n接口契约核心是 Carrier 抽象：协议层只依赖该接口，不依赖具体模型或运行时，满足模型无关与可插拔。"
+}

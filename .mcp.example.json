@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "cscd-protocol": {
+      "command": "python",
+      "args": ["cscd_mcp_server.py"],
+      "cwd": "${workspaceFolder}/cscd",
+      "env": {
+        "LLM_API_URL": "https://api.deepseek.com",
+        "LLM_API_KEY": "${env:LLM_API_KEY}",
+        "LLM_MODEL": "deepseek-chat"
+      }
+    }
+  }
+}
