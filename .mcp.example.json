@@ -3,11 +3,11 @@
     "cscd-protocol": {
       "command": "python",
       "args": ["cscd_mcp_server.py"],
-      "cwd": "${workspaceFolder}/cscd",
+      "cwd": "${workspaceFolder}",
       "env": {
-        "LLM_API_URL": "https://api.deepseek.com",
+        "LLM_API_URL": "https://your-endpoint",
         "LLM_API_KEY": "${env:LLM_API_KEY}",
-        "LLM_MODEL": "deepseek-chat"
+        "LLM_MODEL": "your-model-name"
       }
     }
   }

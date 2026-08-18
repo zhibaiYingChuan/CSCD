@@ -39,14 +39,13 @@
 | `LLM_MODEL` / `OPENAI_MODEL` / `CSCD_MODEL` | 模型名（默认 `deepseek-chat`） |
 
 > 未配置端点时，`cscd_reason` 返回清晰引导错误；配置后即可发起真实推理。
-> 本机实测端点用 `LLM_*`（`token.sensenova.cn/v1`）。
 
 ---
 
 ## 三、MCP 客户端接入配置
 
 ### 3.1 Continue
-编辑 `~/.continue/config.json` 的 `mcpServers`。**路径用相对占位符，不要写死绝对路径**：
+编辑 `~/.continue/config.json` 的 `mcpServers`。**路径用相对占位符，不要写死绝对路径**。`cwd` 应指向仓库根目录（克隆后即为产品根目录）：
 ```json
 {
   "mcpServers": [
@@ -54,11 +53,11 @@
       "name": "cscd-protocol",
       "command": "python",
       "args": ["cscd_mcp_server.py"],
-      "cwd": "${workspaceFolder}/cscd",
+      "cwd": "${workspaceFolder}",
       "env": {
-        "LLM_API_URL": "https://api.deepseek.com",
+        "LLM_API_URL": "https://your-endpoint",
         "LLM_API_KEY": "${env:LLM_API_KEY}",
-        "LLM_MODEL": "deepseek-chat"
+        "LLM_MODEL": "your-model-name"
       }
     }
   ]
@@ -66,16 +65,16 @@
 ```
 
 ### 3.2 Cline
-编辑 `cline_mcp_settings.json`，`cwd` 指向你的 CSCD 仓库根目录（替换为你的实际路径）：
+编辑 `cline_mcp_settings.json`，`cwd` 指向你的仓库根目录（克隆后即为产品根目录）：
 ```json
 {
   "mcpServers": {
     "cscd-protocol": {
       "command": "python",
       "args": ["cscd_mcp_server.py"],
-      "cwd": "${workspaceFolder}/cscd",
-      "env": { "LLM_API_URL": "https://api.deepseek.com",
-               "LLM_API_KEY": "${env:LLM_API_KEY}", "LLM_MODEL": "deepseek-chat" }
+      "cwd": "${workspaceFolder}",
+      "env": { "LLM_API_URL": "https://your-endpoint",
+               "LLM_API_KEY": "${env:LLM_API_KEY}", "LLM_MODEL": "your-model-name" }
     }
   }
 }
@@ -89,9 +88,9 @@
     "cscd-protocol": {
       "command": "python",
       "args": ["cscd_mcp_server.py"],
-      "cwd": "${workspaceFolder}/cscd",
-      "env": { "LLM_API_URL": "https://api.deepseek.com",
-               "LLM_API_KEY": "${env:LLM_API_KEY}", "LLM_MODEL": "deepseek-chat" }
+      "cwd": "${workspaceFolder}",
+      "env": { "LLM_API_URL": "https://your-endpoint",
+               "LLM_API_KEY": "${env:LLM_API_KEY}", "LLM_MODEL": "your-model-name" }
     }
   }
 }
@@ -192,7 +191,7 @@ from carriers.openai_carrier import OpenAICarrier
 from core.cscd import CscdEngine, load_config
 
 carrier = OpenAICarrier(
-    os.getenv("LLM_MODEL") or "deepseek-chat",
+    os.getenv("LLM_MODEL") or "your-model-name",
     os.getenv("LLM_API_URL"), os.getenv("LLM_API_KEY"),
 )
 engine = CscdEngine(carrier, load_config())

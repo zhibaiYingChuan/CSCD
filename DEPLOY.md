@@ -61,7 +61,7 @@ python start_services.py --all      # 一键启动 WebUI(8000) + REST API(8001)
 | 网页打不开 | 服务未启动。运行 `python start_services.py --all` 或双击 `start.bat` |
 | 报"缺少模型名" | 设置 `LLM_MODEL`/`OPENAI_MODEL`（不预设默认） |
 | 报 429 限流 | 端点 TPM 配额耗尽，已内置指数退避重试，等待恢复 |
-| 复制配置后服务起不来 | MCP 配置的 `cwd` 用 `${workspaceFolder}/cscd` 占位符，或替换为你的实际路径 |
+| 复制配置后服务起不来 | MCP 配置的 `cwd` 用 `${workspaceFolder}` 占位符，或替换为你的实际路径 |
 
 ---
 

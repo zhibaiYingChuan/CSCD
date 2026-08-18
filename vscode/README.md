@@ -16,9 +16,9 @@
 1. 启动 C-S-C-D WebUI 后端（提供 `/api/reason`）：
    ```bash
    cd cscd/webui/backend
-   export LLM_API_URL="https://api.deepseek.com"
+   export LLM_API_URL="https://your-endpoint"
    export LLM_API_KEY="sk-..."
-   export LLM_MODEL="deepseek-chat"
+   export LLM_MODEL="your-model-name"
    uvicorn main:app --host 127.0.0.1 --port 8000
    ```
 2. 配置模型端点（`LLM_*` 或 `OPENAI_*`），否则 `/api/reason` 返回 503 引导错误。

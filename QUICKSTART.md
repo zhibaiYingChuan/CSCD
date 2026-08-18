@@ -44,9 +44,9 @@ CSCD 会从环境变量自动发现你已配置的模型端点。
 **方式 A：设置环境变量（推荐）**
 
 ```bash
-set LLM_API_URL=https://api.deepseek.com
+set LLM_API_URL=https://your-endpoint
 set LLM_API_KEY=sk-你的真实Key
-set LLM_MODEL=deepseek-chat
+set LLM_MODEL=your-model-name
 ```
 
 > 也支持 `OPENAI_*`、`DEEPSEEK_*`、`ANTHROPIC_*`、`OPENROUTER_*` 等变量名，任一组已配置即可自动采用。

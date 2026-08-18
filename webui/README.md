@@ -44,9 +44,9 @@ pip install fastapi "uvicorn[standard]" pydantic openai
 ### 1. 本地运行
 ```bash
 cd cscd/webui/backend
-export OPENAI_BASE_URL="https://api.deepseek.com"
+export OPENAI_BASE_URL="https://your-endpoint"
 export OPENAI_API_KEY="sk-..."
-export OPENAI_MODEL="deepseek-chat"     # 可选，默认 deepseek-chat
+export OPENAI_MODEL="your-model-name"     # 可选，默认 deepseek-chat
 uvicorn main:app --host 127.0.0.1 --port 8000
 # 打开 http://127.0.0.1:8000
 ```
