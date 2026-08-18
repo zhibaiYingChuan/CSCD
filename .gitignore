@@ -10,6 +10,9 @@ webui/backend/data/
 # 实验数据 *.jsonl
 *.jsonl
 
+# 对照实验输出（每次运行结果，不提交）
+tests/results/
+
 # 独立验证脚本（非产品）
 verify_*.py
 _verify_*.py

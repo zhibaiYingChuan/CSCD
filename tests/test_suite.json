@@ -1,0 +1,67 @@
+{
+  "meta": {
+    "title": "CSCD 对照实验测试集",
+    "model": "deepseek-v4-flash",
+    "created": "2026-08-19",
+    "groups": {
+      "A": "直答（无协议）",
+      "B": "CSCD单轮（max_rounds=1）",
+      "C": "CSCD多轮（max_rounds=3）"
+    }
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "category": "复杂推理",
+      "title": "电商支付卡单分析",
+      "prompt": "某电商系统出现用户支付成功后订单状态卡在'处理中'的问题。请分析可能原因并提出修复方案。",
+      "checkpoints": [
+        "是否覆盖数据库事务（订单状态更新未提交或回滚）",
+        "是否覆盖幂等性（支付回调重复到达导致状态冲突）",
+        "是否覆盖回调超时（第三方支付回调未到达或延迟）",
+        "是否给出P0/P1/P2优先级排序",
+        "是否给出可执行的修复步骤（而非仅理论分析）"
+      ]
+    },
+    {
+      "id": "T2",
+      "category": "代码审查",
+      "title": "Python函数缺陷审查",
+      "prompt": "请审查以下Python代码的潜在缺陷，包括正确性、性能、安全方面的问题，并给出修复建议。\n\n```python\ndef process_orders(orders: list, discount_rate: float) -> list:\n    \"\"\"处理订单列表，计算折扣后金额并返回结果。\"\"\"\n    results = []\n    for i in range(1, len(orders) + 1):\n        order = orders[i]\n        amount = order[\"amount\"]\n        if amount > 100:\n            amount = amount * discount_rate\n        order[\"amount\"] = amount\n        results.append(order)\n    return results\n\n\ndef get_user_orders(user_id: int) -> list:\n    \"\"\"从数据库查询用户订单。\"\"\"\n    conn = sqlite3.connect(\"orders.db\")\n    cursor = conn.cursor()\n    cursor.execute(f\"SELECT * FROM orders WHERE user_id = {user_id}\")\n    rows = cursor.fetchall()\n    conn.close()\n    return rows\n\n\ndef calculate_discount(price: float, tier: int) -> float:\n    \"\"\"根据会员等级计算折扣价。\"\"\"\n    rates = {1: 0.95, 2: 0.90, 3: 0.85}\n    return price * rates[tier]\n```",
+      "code_to_review": "def process_orders(orders: list, discount_rate: float) -> list:\n    results = []\n    for i in range(1, len(orders) + 1):\n        order = orders[i]\n        amount = order[\"amount\"]\n        if amount > 100:\n            amount = amount * discount_rate\n        order[\"amount\"] = amount\n        results.append(order)\n    return results\n\ndef get_user_orders(user_id: int) -> list:\n    conn = sqlite3.connect(\"orders.db\")\n    cursor = conn.cursor()\n    cursor.execute(f\"SELECT * FROM orders WHERE user_id = {user_id}\")\n    rows = cursor.fetchall()\n    conn.close()\n    return rows\n\ndef calculate_discount(price: float, tier: int) -> float:\n    rates = {1: 0.95, 2: 0.90, 3: 0.85}\n    return price * rates[tier]",
+      "checkpoints": [
+        "是否发现process_orders: for循环索引从1开始，漏掉第0个元素（off-by-one）",
+        "是否发现process_orders: 原地修改传入的order字典，污染原始数据",
+        "是否发现get_user_orders: SQL注入（f-string拼接user_id）",
+        "是否发现calculate_discount: 未处理tier不在{1,2,3}时的KeyError异常",
+        "是否指出get_user_orders: 缺少try/finally，异常时连接未关闭"
+      ]
+    },
+    {
+      "id": "T3",
+      "category": "产品设计",
+      "title": "用户积分系统设计",
+      "prompt": "请设计一个用户积分系统方案，需要包括获取规则、消耗规则、存储方案。",
+      "checkpoints": [
+        "是否覆盖了获取规则（签到、消费、活动等）",
+        "是否覆盖了消耗规则（兑换商品、抵扣金额、等级权益等）",
+        "是否覆盖了存储方案（数据库表结构或缓存策略）",
+        "是否考虑了并发场景（高并发签到/兑换时的防超发）",
+        "是否考虑了防刷机制（频率限制、异常检测）"
+      ]
+    },
+    {
+      "id": "T4",
+      "category": "需求澄清",
+      "title": "模糊需求-商城系统",
+      "prompt": "用户需求：\"我们要做一个商城系统，可以卖东西，有会员，能优惠。尽快出方案。\"请给出设计方案。",
+      "checkpoints": [
+        "是否识别了需求中的模糊点并主动列出（如：卖什么？会员等级？优惠规则？）",
+        "是否先列出待确认问题再给出方案（而非直接给假设性方案）",
+        "是否明确标注了哪些是假设、哪些是确认项",
+        "是否避免过早进入UI/技术选型细节（应优先澄清需求边界）",
+        "是否给出需求澄清的优先级建议（哪些模糊点必须先确认）"
+      ]
+    }
+  ]
+}
