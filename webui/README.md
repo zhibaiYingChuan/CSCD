@@ -16,7 +16,7 @@
 - **推理轨迹示例**：真实模型输出的完整四阶轨迹（DECOMPOSE → CLASSIFY → SELECT → COMBINE + summary），可展开
 - **深/浅主题切换**、响应式
 
-> 数据来源：真实端点（deepseek-v4-flash @ token.sensenova.cn）实测，见 `ab_call_results.jsonl`（路径D vs 基线A）、`defect_probe_results.jsonl`（缺陷排查精准度）。
+> 看板数据为产品预设的真实端点（deepseek-v4-flash @ token.sensenova.cn）实测结果。
 
 ## 目录结构
 
