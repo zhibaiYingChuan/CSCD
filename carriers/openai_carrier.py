@@ -73,7 +73,7 @@ class OpenAICarrier(Carrier):
         client = OpenAI(base_url=self.base_url, api_key=self.api_key, timeout=timeout)
 
         # 指数退避重试：对 429（限流）/ 5xx/连接错误/超时/空响应 自动重试
-        max_retries = 3
+        max_retries = 5  # 429 限流需要更多重试次数
         attempt = 0
         resp = None
         t0 = time.time()  # 总耗时起点（含所有重试等待）
@@ -87,7 +87,12 @@ class OpenAICarrier(Carrier):
             except _retry_excs as e:
                 if attempt >= max_retries:
                     raise
-                wait = 2 ** (attempt - 1)  # 1s -> 2s -> 4s
+                # 429 限流用更长的退避（5s, 10s, 20s, 40s），其他错误用 1s, 2s, 4s
+                is_429 = "429" in str(e) or "rate" in str(e).lower() or "quota" in str(e).lower()
+                if is_429:
+                    wait = 5 * (2 ** (attempt - 1))  # 5s -> 10s -> 20s -> 40s
+                else:
+                    wait = 2 ** (attempt - 1)  # 1s -> 2s -> 4s
                 logger.warning("OpenAI 调用失败（第 %d/%d 次），%s 秒后重试：%s", attempt, max_retries, wait, e)
                 time.sleep(wait)
                 continue

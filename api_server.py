@@ -130,7 +130,9 @@ def _record_usage(api_key: str, payload: dict):
         "rounds": payload.get("rounds", 0),
         "cache_hits": payload.get("cache_hits", 0),
         "complexity": payload.get("complexity", ""),
-        "marks_valid": payload.get("marks_valid", True),
+        # 不得给审计字段编造默认值：缺失即如实记为 None，让统计能区分
+        # 「校验通过」「校验失败」和「本次根本没有四阶轨迹」。
+        "marks_valid": payload.get("marks_valid"),
     }
     import json as _json
     try:

@@ -9,8 +9,15 @@ C-S-C-D MCP Server
   3. 把模型产出的推理轨迹回传校验/抽取（tools）
 
 运行：
-  python cscd_mcp_server.py        # 默认 stdio 传输（MCP 客户端直接拉起）
-  # 或在支持 sse 的网关里以 server 模式挂载
+  python cscd_mcp_server.py                      # stdio（默认，本地 MCP 客户端拉起）
+  CSCD_MCP_TRANSPORT=streamable-http python cscd_mcp_server.py   # 远程 HTTP 部署
+
+两种运行形态（决定工具是否要求模型凭证）：
+  形态A·协议注入 —— 未配置模型端点。本服务只提供协议文本与程序级校验/压缩工具，
+                    四阶推理由宿主模型执行。调用网关自动关闭，无需任何 API Key。
+                    适用于 WorkBuddy 等自带模型能力的平台。
+  形态B·推理网关 —— 配置 LLM_API_URL/LLM_API_KEY/LLM_MODEL。cscd_reason 可用，
+                    并强制 Agent 先经 cscd_reason 再消费其他工具（CSCD_GATEWAY=off 可关）。
 
 依赖：pip install mcp
 """
@@ -29,7 +36,16 @@ from mcp.server.fastmcp import FastMCP
 # 复用既有协议层：校验/抽取直接用 core.marks，协议文本从模板抽取
 from carriers.openai_carrier import load_cscd_system, OpenAICarrier
 
-mcp = FastMCP("cscd-protocol")
+# HTTP 传输参数（远程部署时生效；stdio 模式下这些值不影响行为）。
+# stateless_http=True 是为 WorkBuddy 等云端多用户平台而设：每个请求相互独立，
+# 不维护进程级会话状态，避免 _call_state 这类进程级闩锁在不同用户间串味。
+mcp = FastMCP(
+    "cscd-protocol",
+    host=os.getenv("CSCD_MCP_HOST", "127.0.0.1"),
+    port=int(os.getenv("CSCD_MCP_PORT", "8765")),
+    streamable_http_path=os.getenv("CSCD_MCP_PATH", "/mcp"),
+    stateless_http=(os.getenv("CSCD_MCP_STATELESS", "true").strip().lower() != "false"),
+)
 
 # ---------- 调用网关状态（方案B：强制 Agent 先调用 cscd_reason 再使用其他工具） ----------
 # 解决"工具存在但 Agent 不主动、不正确使用"的核心矛盾：
@@ -49,14 +65,68 @@ _GATE_EXEMPT_TOOLS = {
 }
 
 
+def _engine_configured() -> bool:
+    """是否已配齐模型端点（形态B 推理网关可用）。"""
+    return bool(_ENGINE_BASE_URL and _ENGINE_API_KEY and _ENGINE_MODEL)
+
+
+def _gateway_enabled() -> bool:
+    """是否启用「必须先 cscd_reason」的调用网关。
+
+    网关只对形态B（推理网关）有意义：本服务自己持有模型端点、自己产出轨迹，
+    故可强制 Agent 先走 cscd_reason 再消费产物。
+
+    形态A（协议注入，典型如 WorkBuddy 开放平台）不适用：
+    四阶推理由**宿主模型**执行，本服务只提供协议文本与程序级校验/压缩工具，
+    不存在 cscd_reason 调用，也没有任何用户侧 API Key。
+    此时若仍强制网关，validate/extract/compress 会被永久拦截，三个工具全部失效。
+
+    判定：未配齐模型端点即视为形态A，自动放行；可用 CSCD_GATEWAY=on/off 显式覆盖。
+    """
+    override = (os.getenv("CSCD_GATEWAY") or "auto").strip().lower()
+    if override == "on":
+        return True
+    if override == "off":
+        return False
+    return _engine_configured()
+
+
+def _ledger_readonly() -> bool:
+    """账本是否只读。
+
+    显式环境变量优先（CSCD_LEDGER_READONLY=1/0）。
+    未显式配置时**按运行形态自动判定**：形态A（无模型端点）默认只读。
+
+    这样形态A 不必依赖 mcp.json 的 staticEnv（该字段要求 WorkBuddy >= 5.0.0，
+    会把 minWorkbuddyVersion 抬高并排斥低版本客户端）；
+    形态A 面向云端多用户，服务端本就不应落地用户推理内容。
+    """
+    v = (os.getenv("CSCD_LEDGER_READONLY", "") or "").strip().lower()
+    if v in ("1", "true", "yes", "on"):
+        return True
+    if v in ("0", "false", "no", "off"):
+        return False
+    return not _engine_configured()
+
+
 def _require_reasoned(tool_name: str):
-    """调用网关：除豁免工具外，其余工具须先完成 cscd_reason 推理。"""
+    """调用网关：除豁免工具外，其余工具须先完成 cscd_reason 推理。
+
+    若 cscd_reason 因模型端点慢而超时（MCP 客户端 30s 限制常见），
+    网关保持未解锁——此时应换用更简短的问题重试 cscd_reason（推理成功后即解锁），
+    而非反复调用本工具（会被持续拒绝）。
+    """
     if tool_name in _GATE_EXEMPT_TOOLS:
         return None
+    if not _gateway_enabled():
+        return None  # 形态A：宿主模型自行推理，无 cscd_reason 可调，直接放行
+
     if not _call_state["reasoned"]:
         return (
             "⚠️ 工作流约束：必须先调用 `cscd_reason` 完成推理，才能使用 "
             f"`{tool_name}`。\n"
+            "若之前调用 `cscd_reason` 超时/失败，请用更简短的问题重试它"
+            "（例如把长问题压缩为一句话），推理成功即自动解锁本工具。\n"
             "流程：1) cscd_reason(你的问题) 获得 final_context → "
             "2) 基于 final_context 开展工作 → 3) 需要校验/抽取/压缩时再调用本工具。"
         )
@@ -279,10 +349,20 @@ def cscd_reason(
         "rounds": r.rounds,
         "planned_rounds": r.planned_rounds,
         "marks_valid": r.marks_valid,
+        "missing_marks": getattr(r, "missing_marks", []),
         "cache_hits": r.cache_hits,
         "total_completion_tokens": r.total_completion_tokens,
         "cognition": getattr(r, "cognition", {}),
         "ledger": getattr(r, "ledger", {}),
+        "delivery_artifact": getattr(r, "delivery_artifact", {}),
+        "execution_evidence": getattr(r, "execution_evidence", []),
+        # 路由与模块实际状态：J-Space 为独立分发的第三方套件，未安装时
+        # missing_modules 非空，调用方据此判断本轮是否真的加载了认知模块。
+        "route": getattr(r, "route", ""),
+        "route_score": getattr(r, "route_score", 0),
+        "pass_level": getattr(r, "pass_level", ""),
+        "loaded_modules": getattr(r, "loaded_modules", []),
+        "missing_modules": getattr(r, "missing_modules", []),
         "error": getattr(r, "error", ""),
     }
 
@@ -303,9 +383,24 @@ def cscd_ledger(task_id: str, action: str = "view", payload: dict = None) -> dic
     Returns:
         {task_id, count, entries | resume | status}
     """
+    action = (action or "view").lower()
+
+    # 只读账本模式（远程部署建议开启，CSCD_LEDGER_READONLY=1）：
+    # 账本会把用户推理内容落到服务端磁盘，属于用户数据。远程多用户部署下若允许写入，
+    # 就必须引入鉴权与隔离；关闭写入后服务端不留存任何用户内容，
+    # 「无需认证」的接入方式才成立（WorkBuddy auth_mode 省略的前置条件）。
+    if action in ("note", "ship") and _ledger_readonly():
+        return {
+            "task_id": task_id,
+            "count": 0,
+            "status": "readonly",
+            "message": ("当前部署为只读账本模式：服务端不保存任何用户推理内容，"
+                        "note/ship 已禁用。如需持久化，请在自托管部署中关闭 "
+                        "CSCD_LEDGER_READONLY，并自行提供鉴权与隔离。"),
+        }
+
     from core.ledger import Ledger
     led = Ledger(task_id=task_id)
-    action = (action or "view").lower()
 
     if action == "view":
         return {
@@ -330,6 +425,24 @@ def cscd_ledger(task_id: str, action: str = "view", payload: dict = None) -> dic
     return {"error": f"未知 action: {action}，支持 view/resume/note/ship"}
 
 
+def main() -> None:
+    """控制台入口（`pyproject.toml` 的 `[project.scripts] cscd-mcp` 指向此处）。
+
+    传输选择（环境变量 CSCD_MCP_TRANSPORT）：
+      stdio（默认）—— MCP 客户端（WorkBuddy / Continue / Cline 等）拉起本进程
+      streamable-http —— 远程部署，供云端平台以 HTTPS 连接
+      sse —— 备用远程传输
+
+    注意：stdio 下不得向 stdout 打印任何内容，否则会破坏 MCP 协议帧。
+    """
+    transport = (os.getenv("CSCD_MCP_TRANSPORT") or "stdio").strip().lower()
+    if transport in ("streamable-http", "streamablehttp", "streamable_http", "http"):
+        mcp.run(transport="streamable-http")
+    elif transport == "sse":
+        mcp.run(transport="sse")
+    else:
+        mcp.run()
+
+
 if __name__ == "__main__":
-    # stdio 传输：MCP 客户端（Continue/Cline 等）配置 command 拉起本文件即可
-    mcp.run()
+    main()

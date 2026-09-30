@@ -108,10 +108,15 @@ class CscdService:
             "total_completion_tokens": r.total_completion_tokens,
             "pass_level": getattr(r, "pass_level", "fast"),
             "loaded_modules": getattr(r, "loaded_modules", []),
+            "missing_modules": getattr(r, "missing_modules", []),
+            "route": getattr(r, "route", ""),
+            "route_score": getattr(r, "route_score", 0),
             # 推理时认知控制审计（J-Space/dsh 补全）
             "cognition": getattr(r, "cognition", {}),
             # 运行时状态外化账本审计（P4）
             "ledger": getattr(r, "ledger", {}),
+            "delivery_artifact": getattr(r, "delivery_artifact", {}),
+            "execution_evidence": getattr(r, "execution_evidence", []),
         }
 
 

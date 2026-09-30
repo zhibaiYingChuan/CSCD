@@ -87,12 +87,27 @@
 
 | 字段 | 含义 | 使用建议 |
 | :--- | :--- | :--- |
-| `reason` | 终端回传文本 | 直接作为最终回答（simple 短路 = 基线文本；协议路径 = 精炼结论） |
+| `reason` | 终端回传文本 | 直接作为最终回答（simple 短路 = 基线文本；协议路径 = 四阶轨迹） |
 | `final_context` | 程序级压缩后的最终输出 | 同上，二者通常一致 |
 | `complexity` / `strategy` | 复杂度与推理策略 | 审计 / 元信息 |
-| `marks_valid` | 轨迹四阶是否完整 | 为 `true` 说明协议结构合规 |
+| `rounds` | 实际推理轮次 | 审计；`1` 表示走短路或单轮 |
+| `marks_valid` | 四阶结构是否合规 | **必须结合 `rounds` 解读**，见下方说明 |
+| `missing_marks` | 缺失的四阶段名 | `marks_valid=false` 且 `rounds>1` 时据此排查 |
+| `route` / `route_score` | 动态路由与复杂度评分 | 审计 |
+| `pass_level` / `loaded_modules` / `missing_modules` | J-Space 通行级与模块实际加载情况 | `missing_modules` 非空表示模块未安装，认知控制降级但四阶协议不受影响 |
 | `cache_hits` | 命中单原子缓存轮数 | 性能诊断 |
 | `total_completion_tokens` | 累计输出 Token | Token 计量 |
+
+### `marks_valid` 的正确解读
+
+`marks_valid` 不会为了让结果好看而恒为 `true`：
+
+- **短路路径**（`complexity=simple` 且 `rounds=1`）：走基线直答，**不执行四阶协议**，
+  因此 `marks_valid=false`。这是正常状态，`reason` 是直接答案而非四阶轨迹。
+- **协议路径**（`rounds>1`）：`marks_valid=true` 表示四阶结构完整；
+  为 `false` 时说明输出确实不合规，应读 `missing_marks` 并重新提问或改写任务。
+
+**不要**把 `marks_valid=false` 一律当作工具故障——先看 `complexity` 和 `rounds` 判断本次是否本就走短路。
 
 ---
 

@@ -20,6 +20,8 @@ J-Space V3.6 模块注册表与通行级闸门（严格映射自真实仓库源�
 本模块只负责"何时加载哪个模块"的注册与判定，不负责执行推理。
 """
 
+from pathlib import Path
+import os
 from typing import Literal
 
 # 通行级（对应 SKILL.md 的 fast/full/loop 闸门）
@@ -154,3 +156,77 @@ def module_summary() -> str:
     """生成 9 模块清单（供协议层提示/日志）。"""
     lines = [f"- {k}: {v['desc']}（触发: {v['trigger']}）" for k, v in JSPACE_MODULES.items()]
     return "\n".join(lines)
+
+
+def module_root() -> Path:
+    """返回 J-Space 模块目录，允许通过环境变量替换测试或部署路径。
+
+    J-Space 是独立分发的第三方 Skill 套件（有自己的 LICENSE），不随本仓库入库。
+    因此该目录在标准安装中**可能不存在**——这是预期状态，不是错误。
+    可用 CSCD_JSPACE_MODULES_DIR 指向本地安装。
+    """
+    configured = os.getenv("CSCD_JSPACE_MODULES_DIR")
+    if configured:
+        return Path(configured)
+    return Path(__file__).parent.parent / "tests" / "j-space" / "j-space" / "modules"
+
+
+def modules_available() -> bool:
+    """J-Space 模块目录是否可用；不可用时上层应显式降级而非静默假设已加载。"""
+    return module_root().is_dir()
+
+
+def load_modules(names: list[str], root: Path | None = None) -> dict[str, str]:
+    """按需读取模块文件内容；缺失模块不伪造内容。"""
+    base = Path(root) if root else module_root()
+    loaded: dict[str, str] = {}
+    for name in names:
+        metadata = JSPACE_MODULES.get(name)
+        if not metadata:
+            continue
+        path = base / Path(metadata["file"]).name
+        if path.exists():
+            loaded[name] = path.read_text(encoding="utf-8")
+    return loaded
+
+
+def load_selected_modules(pass_level: PassLevel, named: list[str] = None,
+                           has_untrusted_input: bool = False,
+                           root: Path | None = None) -> dict[str, str]:
+    """先完成门控，再读取当前轮次实际需要的模块内容。"""
+    names = select_modules(pass_level, named, has_untrusted_input)
+    return load_modules(names, root=root)
+
+
+_PHASE_MODULES: dict[str, list[str]] = {
+    "anchor": ["directed-focus"],
+    "explore": ["capacity", "broadcast", "deep-reasoning"],
+    "implement": ["capacity", "broadcast", "directed-focus"],
+    "verify": ["empirics", "self-monitoring"],
+    "ship": ["self-monitoring", "empirics"],
+}
+
+
+def modules_for_phase(phase: str, pass_level: PassLevel, has_untrusted_input: bool = False) -> list[str]:
+    """按当前运行阶段选择模块；阶段白名单优先，untrusted 内省模块例外强制保留。"""
+    allowed = _PHASE_MODULES.get(phase, [])
+    selected = select_modules(pass_level, allowed, has_untrusted_input)
+    return [name for name in selected if name in allowed or name == "introspection"]
+
+
+def load_phase_modules(phase: str, pass_level: PassLevel,
+                       has_untrusted_input: bool = False,
+                       root: Path | None = None) -> tuple[list[str], dict[str, str]]:
+    """重新计算并读取当前阶段模块，缺失正文不会伪造成功。"""
+    names = modules_for_phase(phase, pass_level, has_untrusted_input)
+    return names, load_modules(names, root=root)
+
+
+def modules_context(modules: dict[str, str]) -> str:
+    """将本轮已加载模块组成上下文；未加载模块不会进入请求。"""
+    if not modules:
+        return ""
+    sections = ["[J-Space 当前轮次模块]"]
+    for name, content in modules.items():
+        sections.append(f"\n## {name}\n{content}")
+    return "\n".join(sections)

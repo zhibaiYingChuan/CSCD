@@ -132,10 +132,21 @@
 | `complexity` / `strategy` / `task_type` | 复杂度 / 推理策略 / 任务类型 |
 | `rounds` / `planned_rounds` | 实际轮次 / 计划轮次 |
 | `marks_valid` / `missing_marks` | 四阶轨迹是否合规 / 缺失段 |
+| `route` / `route_score` | 动态路由结果（fast/standard/deep）与复杂度评分 |
+| `pass_level` / `loaded_modules` / `missing_modules` | J-Space 通行级、**实际**加载到的模块、计划加载但缺失的模块 |
 | `cache_hits` / `cache_saved_tokens` | 缓存命中轮数 / 节省 Token |
 | `total_completion_tokens` | 累计输出 Token |
 | `cognition` | 认知控制审计（workspace/稠密轨/桥接/元认知/锚定） |
 | `ledger` | 账本审计（task_id/count/last_ship） |
+| `delivery_artifact` / `execution_evidence` | 交付物与执行证据 |
+
+> **审计字段必须如实读取。** `marks_valid=false` 有两种含义，请结合 `rounds` 区分：
+> 短路路径（`complexity=simple` 且 `rounds=1`）本就不执行四阶协议，此时为 `false` 属正常；
+> 若 `rounds>1` 仍为 `false`，则说明四阶输出确实不合规，应按 `missing_marks` 排查。
+>
+> `missing_modules` 非空表示 J-Space 模块目录不可用（该第三方套件不随本仓库分发）。
+> 此时认知控制层退化为仅使用 `cognition` 中的基础规则，不影响四阶协议执行。
+> 如需启用，请安装 J-Space 后设置 `CSCD_JSPACE_MODULES_DIR` 指向其 `modules` 目录。
 
 ### 4.3 Resources（3 个）
 

@@ -1,21 +1,63 @@
-# Python 运行时缓存
+# 运行时产物（账本/工作区，可随时重建）
+.cscd/
+.cscd-test/
+# 这些数字目录是历史运行产物，内部还有同名嵌套目录，
+# 故用 /** 递归匹配；仅写目录名在存在嵌套子目录时会漏匹配。
+0/**
+1/**
+2/**
+3/**
+4/**
+5/**
+6/**
+7/**
+
+# 测试沙箱与基准数据（体积数百 MB，不入库）
+deepswe-sandboxes/
+tests/deep-swe/
+tests/benchmarks/
+tests/bugfix/
+tests/dsh/
+tests/j-space/
+tests/results/
+
+# 打包与验证临时目录
+_pkgtest/
+_pkgtest2/
+_pkgcheck/
+_jstest/
+build/
+dist/
+*.egg-info/
+
+# 打包产物
+dist-connector/
+
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
+.venv/
+venv/
 
-# CSCD 运行时数据（账本、日志、用量）
-.cscd/
-webui/backend/data/
+# Node（连接器依赖随 zip 分发，不入库；clone 后需在 server-js 下 npm install）
+node_modules/
+
+# 连接器运行时产物
+workbuddy-connector/server-js/.cscd-ledger/
+
+# 本地环境变量（严禁入库）
+.env
 
 # 实验数据 *.jsonl
 *.jsonl
 
-# 对照实验输出（每次运行结果，不提交）
-tests/results/
-
 # 独立验证脚本（非产品）
 verify_*.py
 _verify_*.py
+_audit_*.py
+_check_pkg_version.py
+_debug_cache.py
 
 # 独立运行脚本（非产品）
 run_ab_call.py
@@ -29,8 +71,6 @@ run_verify_native.py
 # 对照实验脚本
 pathA_standard.py
 pathB_cscd.py
-
-# 基准日志
 bench_log.py
 
 # 任务输入文件
