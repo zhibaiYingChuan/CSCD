@@ -1,0 +1,10 @@
+# MCP 服务与核心引擎
+mcp>=1.9.0
+openai>=1.0.0
+pyyaml>=6.0
+tiktoken>=0.7.0
+
+# REST API 与 WebUI 看板（仅运行 api_server / webui 时需要）
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.0.0
