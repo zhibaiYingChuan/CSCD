@@ -146,6 +146,11 @@ class CscdResult:
     loaded_modules: list = field(default_factory=list)  # 实际按需加载的模块
     missing_modules: list = field(default_factory=list)  # 计划加载但缺失的模块（J-Space 未安装时非空）
     untrusted_input: bool = False   # 不可信输入标志（强制 introspection）
+    # ---- 路径选择说明（供调用方判断本次到底执行了什么）----
+    # 走短路时四阶协议根本没有执行。此前只靠 marks_valid=False 让调用方
+    # 反推，容易被误读为「工具故障」或「脏数据」。这里显式给出路径与原因。
+    path_taken: str = "protocol"     # protocol=四阶递归 / baseline_shortcut=基线直答
+    path_reason: str = ""           # 选择该路径的原因（面向人类可读）
     # ---- 阶段B：程序级级联压缩字段 ----
     rounds: int = 1                 # 实际递归轮次
     summaries: list = field(default_factory=list)   # 每轮压缩摘要（next_round_context）
@@ -496,6 +501,16 @@ class CscdEngine:
                 loaded_modules=loaded,
                 missing_modules=missing_modules,
                 untrusted_input=has_untrusted_input,
+                # 显式声明走了短路：本次未执行四阶协议，reason 是基线直答。
+                # 调用方据此判断「要不要追问」或「改用 medium 问法强制走协议」。
+                path_taken="baseline_shortcut",
+                path_reason=(
+                    f"任务判定为 simple（task_type={task_type}）且无可信输入，"
+                    f"按 simple_shortcut_to_baseline 走基线直答以节省 Token。"
+                    f"本次未执行四阶协议，reason 为直接答案而非结构化轨迹。"
+                    f"如需四阶拆解，请把问题描述得更具体（涉及多因素权衡或需区分事实与假设），"
+                    f"或设置 has_untrusted_input=true 强制走协议路径。"
+                ),
                 recursed=False,
                 rounds=1,
                 planned_rounds=1,
@@ -834,6 +849,11 @@ class CscdEngine:
             loaded_modules=loaded,
             missing_modules=missing_modules,
             untrusted_input=has_untrusted_input,
+            path_taken="protocol",
+            path_reason=(
+                f"任务判定为 {complexity}（task_type={task_type}），"
+                f"执行 {rounds} 轮四阶协议递归（计划 {planned_rounds} 轮）。"
+            ),
             rounds=rounds,
             summaries=summaries,
             compress_methods=compress_methods,

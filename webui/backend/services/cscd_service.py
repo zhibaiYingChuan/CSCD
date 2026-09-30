@@ -103,6 +103,8 @@ class CscdService:
             "planned_rounds": r.planned_rounds,
             "marks_valid": r.marks_valid,
             "missing_marks": r.missing_marks,
+            "path_taken": getattr(r, "path_taken", "protocol"),
+            "path_reason": getattr(r, "path_reason", ""),
             "cache_hits": r.cache_hits,
             "cache_saved_tokens": r.cache_saved_tokens,
             "total_completion_tokens": r.total_completion_tokens,

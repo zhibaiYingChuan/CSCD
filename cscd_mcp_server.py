@@ -350,6 +350,10 @@ def cscd_reason(
         "planned_rounds": r.planned_rounds,
         "marks_valid": r.marks_valid,
         "missing_marks": getattr(r, "missing_marks", []),
+        # 本次实际执行了什么路径。调用方据此判断 reason 是四阶轨迹还是基线直答，
+        # 不必再靠 marks_valid 反推——后者在短路时为 false，容易被误读为故障。
+        "path_taken": getattr(r, "path_taken", "protocol"),
+        "path_reason": getattr(r, "path_reason", ""),
         "cache_hits": r.cache_hits,
         "total_completion_tokens": r.total_completion_tokens,
         "cognition": getattr(r, "cognition", {}),

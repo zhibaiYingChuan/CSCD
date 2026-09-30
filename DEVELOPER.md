@@ -101,9 +101,74 @@
 
 ---
 
-## 四、Tool / Resource API 参考
+## 四、运行时工作空间与阶段
 
-### 4.1 Tools（6 个）
+### 4.1 持久化结构
+
+每个任务会在 `.cscd/` 下产生可审计数据（目录可用 `CSCD_RUNTIME_DIR` 覆盖）：
+
+```text
+.cscd/
+├── workspace/          # 当前状态投影
+│   ├── goal.md         # 目标与完成条件
+│   ├── verified.md     # 已验证事实
+│   ├── open.md         # 开放问题
+│   └── next.md         # 下一步动作
+├── traces/
+│   └── task.jsonl      # 事件日志，可重放恢复
+└── artifacts/
+    ├── tests.json      # 交付物、测试结果、变更文件
+    ├── checkpoints/    # <point>.json 跨进程回滚点
+    └── patches/
+```
+
+### 4.2 关键事件
+
+`traces/task.jsonl` 中每行含 `ts` / `event` / `state` / `payload`：
+
+| 事件 | 含义 |
+|------|------|
+| `action_planned` | 记录本轮动作计划 |
+| `action_planning_failed` | 规划器返回空计划 |
+| `action_recovery_requested` | 本批动作全失败，要求重新规划 |
+| `action_loop_exhausted` | 达到最大重规划步数仍未交付 |
+| `first_read` / `first_edit` / `first_test` | 轨迹锚定与阶段推进依据 |
+| `modules_loaded` | 本轮实际加载的 J-Space 模块 |
+| `verification_completed` | 验证完成（需通过的测试证据） |
+| `ship` / `ship_blocked` | 交付成功或被证据门禁阻断 |
+| `checkpoint` / `rollback` | 回滚点保存与恢复 |
+
+### 4.3 阶段与可用动作
+
+| 阶段 | 可用动作 |
+|------|---------|
+| `anchor` | `read`、`search` |
+| `explore` | `read`、`search`、`anchor_completed`、`exploration_completed` |
+| `implement` | `read`、`search`、`edit`、`write`、`checkpoint`、`rollback`、`implementation_completed` |
+| `verify` | `read`、`search`、`run_test`、`inspect_failure`、`checkpoint`、`rollback`、`verification_completed` |
+| `ship` | `read`、`search`、`checkpoint`、`rollback`、`ship` |
+
+阶段只能前进，不能后退；`rollback` 事件可恢复到 checkpoint 记录的阶段。
+
+### 4.4 交付门禁
+
+`verification_completed` 与 `ship` 都要求存在结构化通过的测试证据：
+
+```json
+{"command": "python -m pytest", "returncode": 0, "ok": true}
+```
+
+只有 `ok: true` 或 `returncode: 0` 的结果才被认可。
+模型的自然语言声明（如"测试通过"）不构成证据。
+
+跨进程回滚点位于 `.cscd/artifacts/checkpoints/<point>.json`，
+进程重启后仍可加载并恢复文件与状态。
+
+---
+
+## 五、Tool / Resource API 参考
+
+### 5.1 Tools（6 个）
 
 | 工具 | 说明 |
 |------|------|
@@ -114,7 +179,7 @@
 | `extract_cscd_marks(trace)` | 抽取四阶各段内容 |
 | `compress_cscd_round(trace, ratio)` | 程序级压缩，返回替代原始全量的 `next_round_context` |
 
-### 4.2 `cscd_reason` 参数详解
+### 5.2 `cscd_reason` 参数详解
 
 | 参数 | 类型 | 默认 | 说明 |
 |------|------|------|------|
@@ -132,6 +197,7 @@
 | `complexity` / `strategy` / `task_type` | 复杂度 / 推理策略 / 任务类型 |
 | `rounds` / `planned_rounds` | 实际轮次 / 计划轮次 |
 | `marks_valid` / `missing_marks` | 四阶轨迹是否合规 / 缺失段 |
+| `path_taken` / `path_reason` | **本次实际走的路径**（`protocol` / `baseline_shortcut`）及原因 |
 | `route` / `route_score` | 动态路由结果（fast/standard/deep）与复杂度评分 |
 | `pass_level` / `loaded_modules` / `missing_modules` | J-Space 通行级、**实际**加载到的模块、计划加载但缺失的模块 |
 | `cache_hits` / `cache_saved_tokens` | 缓存命中轮数 / 节省 Token |
@@ -140,15 +206,25 @@
 | `ledger` | 账本审计（task_id/count/last_ship） |
 | `delivery_artifact` / `execution_evidence` | 交付物与执行证据 |
 
-> **审计字段必须如实读取。** `marks_valid=false` 有两种含义，请结合 `rounds` 区分：
-> 短路路径（`complexity=simple` 且 `rounds=1`）本就不执行四阶协议，此时为 `false` 属正常；
-> 若 `rounds>1` 仍为 `false`，则说明四阶输出确实不合规，应按 `missing_marks` 排查。
+> **先看 `path_taken`，再读 `marks_valid`。**
+>
+> | `path_taken` | 含义 | `reason` 是什么 | `marks_valid` |
+> |-------------|------|----------------|---------------|
+> | `protocol` | 执行了四阶递归 | 四阶轨迹 | true 表示结构完整 |
+> | `baseline_shortcut` | 任务判为 simple，走基线直答省 Token | **直接答案，无四阶结构** | **false 属正常** |
+>
+> `baseline_shortcut` 不是故障，也不是「脏数据」——它表示本次**没有**做结构化拆解。
+> `path_reason` 会说明触发原因与如何强制走协议：把问题描述得更具体
+> （涉及多因素权衡、需区分事实与假设），或传 `has_untrusted_input=true`。
+>
+> 仅当 `path_taken=protocol` 且 `marks_valid=false` 时才是真异常，
+> 此时按 `missing_marks` 排查模型输出。
 >
 > `missing_modules` 非空表示 J-Space 模块目录不可用（该第三方套件不随本仓库分发）。
 > 此时认知控制层退化为仅使用 `cognition` 中的基础规则，不影响四阶协议执行。
 > 如需启用，请安装 J-Space 后设置 `CSCD_JSPACE_MODULES_DIR` 指向其 `modules` 目录。
 
-### 4.3 Resources（3 个）
+### 5.3 Resources（3 个）
 
 | Resource | 用途 |
 |----------|------|
@@ -158,9 +234,9 @@
 
 ---
 
-## 五、完整调用示例
+## 六、完整调用示例
 
-### 5.1 一次推理 + 账本续跑
+### 6.1 一次推理 + 账本续跑
 ```
 # 调用1：执行推理（task_id 固定，便于续跑）
 cscd_reason(question="设计带权限的 TODO 后端", task_id="todo-api")
@@ -172,7 +248,7 @@ cscd_ledger(task_id="todo-api", action="view")
 cscd_ledger(task_id="todo-api", action="resume")
 ```
 
-### 5.2 协议插件形态（细粒度控制，宿主 Agent）
+### 6.2 协议插件形态（细粒度控制，宿主 Agent）
 1. `get_cscd_system_prompt()` → 注入 system
 2. 发起模型推理，产出四阶轨迹
 3. `validate_cscd_trace(trace)` → 校验，失败则重试补全
@@ -181,7 +257,7 @@ cscd_ledger(task_id="todo-api", action="resume")
 
 ---
 
-## 六、常见问题与排错（FAQ）
+## 七、常见问题与排错（FAQ）
 
 | 问题 | 原因与解决 |
 |------|-----------|
@@ -194,7 +270,7 @@ cscd_ledger(task_id="todo-api", action="resume")
 
 ---
 
-## 七、从代码调用（非 MCP，Python）
+## 八、从代码调用（非 MCP，Python）
 
 ```python
 import os
