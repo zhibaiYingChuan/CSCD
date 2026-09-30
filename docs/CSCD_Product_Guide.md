@@ -149,22 +149,27 @@ checkpoint 存储在：
 - planner 会在最大步数内继续重规划
 - 达到上限记录 `action_loop_exhausted`
 
-## XML 兼容边界
+## 输出模式边界
 
-XML 四阶标记仍可被解析，但默认不是主路径。
+`prefer_action_plan` 决定模型每轮输出什么，直接影响四阶协议是否执行。
 
 默认配置：
 
 ```yaml
-prefer_action_plan: true
+prefer_action_plan: false
 legacy_marks_fallback: false
 ```
 
-只有需要兼容旧样本时才显式开启：
+**`false` 是默认值，且是 MCP 推理网关的正确取值。** 此时模型按 PERSONA 输出
+`<DECOMPOSE>/<CLASSIFY>/<SELECT>/<COMBINE>`，四阶协议是 CSCD 的主路径，
+`marks_valid` 才有审计意义。
 
-```yaml
-legacy_marks_fallback: true
-```
+> 不要把它改成 `true`。动作模式会要求「不输出 XML 标记」，与四阶要求直接冲突，
+> 模型会陷入权衡并把思考过程当正文输出，四阶协议完全不执行。
+> 该模式仅用于代码工程闭环（由 Harness 把动作落地到文件系统），不适用于推理任务。
+
+`legacy_marks_fallback` 只决定是否兼容旧输出格式，**不影响是否校验**。
+四阶标记始终真校验，审计字段不会因该开关而失真。
 
 ## 故障排查
 

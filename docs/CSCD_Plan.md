@@ -14,11 +14,12 @@ RuntimeState、Harness、反馈修订、工作空间和动作计划是支撑验�
 
 ## 已实现
 
-### 1. XML 兼容层
+### 1. 四阶协议（主路径）
 
-- 四阶标记解析和校验仍然存在。
-- XML 已经从主协议降级为兼容层。
-- 它保留审计价值，但不应再主导流程设计。
+- 四阶标记解析和校验是 `CscdEngine` 的主协议，不是兼容层。
+- `prefer_action_plan` 默认为 `false`，MCP 推理网关必须保持该值。
+- 动作计划（JSON）是**代码工程闭环**下的另一种输出形态，与四阶协议互斥，
+  仅在显式开启 `prefer_action_plan: true` 时使用。
 
 ### 2. RuntimeState
 
@@ -56,30 +57,29 @@ RuntimeState、Harness、反馈修订、工作空间和动作计划是支撑验�
 
 ### 1. 主循环 `run()`
 
-- 目前已经支持动作计划优先。
-- 但主循环仍保留四阶标记路径和兼容逻辑。
-- 还没有完全切换成 Harness 单一路径。
+- 四阶协议路径与动作计划路径共存，由 `prefer_action_plan` 决定走哪条。
+- 两条路径的阶段与证据规则已统一，尚未合并为单一路径。
 
-### 2. 动作计划优先
+### 2. 动作计划输出稳定性
 
-- 已具备 JSON 动作计划解析能力。
-- 真实模型输出仍可能混入四阶标记或自然语言。
-- 需要进一步提高动作计划输出稳定性。
+- 已具备 JSON 动作计划解析能力，并优先于 XML 标签识别。
+- 仅在代码工程闭环中启用；推理任务仍走四阶协议。
 
 ### 3. 轨迹锚定
 
-- 目标是让锚定由真实 `read/search` 事件驱动。
-- 当前仍需要继续检查是否存在提前写入或隐式晋升。
+- 锚定由真实 `read/search` 事件驱动 `first_read` 晋升。
+- 需持续确认不存在提前写入或隐式晋升。
 
 ### 4. 认知模块加载
 
-- J-Space 模块注册和门控已经存在。
-- 但模块内容在主流程中的加载和注入仍需继续收敛。
+- J-Space 模块注册和门控已存在，按 phase 动态选择并注入正文。
+- J-Space 为独立分发的第三方套件，不随本仓库提供；未安装时通过
+  `missing_modules` 显式报告缺失，不伪造加载成功。
 
 ### 5. SHIP 验证
 
-- 已有验证门控。
-- 但还需要持续确保它完全依赖真实测试证据，而不是只依赖模型声明。
+- 已有验证门控，`verification_completed` 与 `ship` 均要求真实通过的测试证据。
+- 需持续确保判定只依据 `test_results`，不采信模型声明。
 
 ## 后续推进原则
 
@@ -88,10 +88,12 @@ RuntimeState、Harness、反馈修订、工作空间和动作计划是支撑验�
 - 后续改动优先围绕 `CscdEngine.run()` 的主流程收敛。
 - 新能力必须服务于主闭环，而不是另起旁路。
 
-2. 动作优先
+2. 四阶优先
 
-- 模型输出应优先收敛为动作计划。
-- 四阶标记只保留为兼容和审计。
+- 推理类任务的主路径是四阶协议，审计字段依赖它。
+- 动作计划只在代码工程闭环中启用，且必须显式配置开启。
+- 两种模式不可同时要求模型输出——真实端点已验证冲突会导致模型
+  把权衡过程写入正文，四阶完全不执行。
 
 3. 证据优先
 
@@ -122,35 +124,37 @@ RuntimeState、Harness、反馈修订、工作空间和动作计划是支撑验�
 
 ### 记录示例
 
-- 2026-08-19：将 XML 从主协议降级为兼容层，动作计划优先解析已接入，验证测试通过。
 - 2026-08-19：补齐 `ship` 的验证门控测试，要求验证事件与测试结果共同存在。
-- 2026-08-19：主循环默认关闭 `legacy_marks_fallback`，非动作文本只作为观察，不再进入 XML 主路径；兼容旧样本时显式开启该开关。
+- 2026-08-19：主循环默认关闭 `legacy_marks_fallback`，兼容旧样本时显式开启该开关。
+- 2026-09-30：修正记录错误。早期曾把 XML 降级为兼容层并让动作计划优先，
+  该方向已被推翻——四阶协议是主路径。详见下方「已完成的加固工作」。
 
-## P3 当前目标
+## 已完成的加固工作
 
-P3 的目标是把“动作计划优先”稳定成默认路径，并持续削弱四阶标记对主流程的影响。
+以下工作已完成并入库，不再是待办：
 
-### P3 要做的事
+1. 四阶输出稳定性
 
-1. 进一步稳定模型输出协议
+- 协议模式的输出指令显式声明唯一交付物为四阶 XML，并禁止输出思考过程、
+  自我权衡与英文分析。修复前真实端点会把权衡独白写进正文。
 
-- 让模型更稳定地产出 JSON 动作计划。
-- 减少混合四阶标记文本对主流程的干扰。
+2. 审计字段真实性
 
-2. 继续削弱 `parse_marks`
+- 短路路径不再硬编码 `marks_valid=True`（此前是伪造审计值）。
+- 四阶不合规时不再把污染全文当结论交付，改回传压缩摘要。
+- `loaded_modules` 改为报告实际加载结果，并新增 `missing_modules`。
 
-- 只保留旧样本兼容。
-- 不再让它影响主执行路径。
+3. 命令执行安全
 
-3. 统一动作证据
+- `run_test` 从子串黑名单改为逐字符扫描，并拒绝可执行任意代码的解释器。
 
-- 所有动作的结果统一写入工作空间。
-- 让 `changed_files`、`test_commands`、`test_results`、`rollback_points` 的来源一致。
+4. 动作证据统一
 
-4. 固化验证门槛
+- `changed_files`、`test_commands`、`test_results`、`rollback_points` 来源一致。
 
-- `verification_completed` 必须依赖真实测试结果。
-- `ship` 必须在验证完成后才能通过。
+5. 验证门槛固化
+
+- `verification_completed` 与 `ship` 均要求真实通过的测试证据。
 
 ## 下一阶段：产品完善路线
 
@@ -235,86 +239,17 @@ P3 的目标是把“动作计划优先”稳定成默认路径，并持续削�
 - 2026-08-19：阶段 B 完成五个 runtime phase 的模块契约与缺失正文审计；阶段 C 完成跨进程 `ship_blocked → test evidence → verification_completed → ship` 验收；全量 47 passed，3 个子测试通过。
 - 2026-08-19：阶段 D 完成 MCP/REST/WebUI 运行时证据字段一致性，新增入口契约测试；新增 `docs/CSCD_Product_Guide.md`，全量 49 passed、1 warning、3 个子测试通过。真实模型端到端仍需有效环境配置。
 - 2026-08-19：全局代码审查四项问题全部修复：阻断交付不再写 ledger.ship、失败测试不再触发 run() ship、replay 正确恢复 rollback phase/状态、run_test 禁止 shell 组合命令并使用 shell=False；新增回归测试，全量 52 passed、1 warning、3 个子测试通过。
+- 2026-09-30：全量审查修复 6 项缺陷并入库。补齐 4 个未入库核心模块（此前全新克隆会因 `ModuleNotFoundError` 直接不可用）；封堵 `run_test` 命令绕过；J-Space 缺失改为显式降级并新增 `missing_modules`；修复原子写异常路径；审计字段去伪造；路由实现统一。
+- 2026-09-30：移除 4 个已过时的对照实验产物，入库 13 个守护产品不变量的回归测试。
+- 2026-09-30：修正文档与实现不一致。`CSCD_Product_Guide.md` 曾标注 `prefer_action_plan: true`，
+  与 `config.yaml` 实际的 `false` 相反，照此配置会让四阶协议完全失效；本文件亦曾把四阶协议
+  误述为「兼容层」。两处均已按实现改正，并删除 DeepSWE 实验记录。
 
 ## 边界
 
-- 这套系统的目标是运行时控制，不是通用自治代理。
-- 它适合长任务、分阶段执行、证据化交付。
+- 这套系统的目标是结构化推理验证，不是通用自治代理。
+- 它适合需要追踪推理依据、区分证据边界的复杂问题。
 - 它不负责取代完整 IDE，也不负责承诺所有任务一次完成。
-- XML 只是一层兼容，不是未来的主方向。
-
-## DeepSWE 实验记录
-
-### 2026-08-20：CSCD-only 15 任务运行
-
-状态：环境烟雾测试完成，benchmark 成绩无效。
-
-配置：
-
-- 模型：`deepseek-v4-flash`
-- 端点：`https://token.sensenova.cn/v1`
-- 模式：CSCD-only，无对照组
-- 任务数：15
-- 结果文件：`tests/benchmarks/deepswe_results/deepswe_cscd_only_20260820_020303.json`
-
-结果：
-
-- 请求完成：15/15
-- 请求错误：0
-- `ship_blocked`：15/15
-- `run_test`：0
-- `verification_completed`：0
-- `ship`：0
-
-偏差判定：
-
-- 当前 runner 未接入 Pier/Harbor 任务沙箱。
-- `pier`、`uv`、`harbor` 本地不可用；仅检测到 Docker。
-- 所有任务实际搜索的是 CSCD 当前仓库，而不是各自 DeepSWE 目标仓库。
-- 因此本次结果只能证明 API 调用、状态外化和交付阻断逻辑可运行，不能证明代码任务完成率或 DeepSWE pass rate。
-
-下一次实验硬门禁：
-
-1. 每个任务必须有独立 sandbox root。
-2. sandbox root 必须包含目标仓库代码。
-3. `runtime_root` 必须指向该任务 sandbox。
-4. 必须执行任务 verifier/test.sh。
-5. 结果必须同时记录模型动作、改动文件、测试结果和 verifier pass/fail。
-6. 未满足以上条件时，实验脚本必须在发起模型调用前阻断。
-7. runner 必须强制要求 `--sandbox-root`，并逐任务检查目标工作目录和 verifier。
-
-当前实现：
-
-- `tests/benchmarks/run_deepswe_cscd.py` 已增加 `--sandbox-root` 强制参数。
-- 缺少 sandbox、目标任务目录或 `tests/test.sh` 时返回门禁错误码，不创建模型载体、不发起模型请求。
-- 每个任务的 `runtime_root/runtime_dir` 绑定到独立 sandbox 子目录。
-- `tests/test_deepswe_experiment_gate.py` 已覆盖门禁阻断、目标仓库标志、task.toml/verifier 和无密钥 preflight 报告。
-- runner 支持 `--check-only --preflight-report <path>`，只检查环境并生成机器可读报告，不创建模型载体。
-- 当前本地仍未准备真实任务沙箱，因此禁止启动 DeepSWE benchmark。
-- 2026-08-20 下一步 preflight：Docker daemon 未运行，`deepswe-sandboxes` 不存在，check-only 以错误码 3 阻断；报告为 `tests/benchmarks/deepswe_results/preflight-20260820.json`，未发起模型请求。
-- 2026-08-20：已启动 Docker Desktop，daemon 版本 29.6.2 响应；本地未发现 DeepSWE 任务镜像，`deepswe-sandboxes` 仍不存在；preflight 继续以错误码 3 阻断，报告为 `tests/benchmarks/deepswe_results/preflight-20260820-docker-ready.json`，未发起模型请求。
-- 2026-08-20：已完成依赖审计（15 个镜像、12 个仓库、4 种语言），15 个镜像已全部拉取（总大小约 50GB）；`deepswe-sandboxes` 根目录已创建，但缺少目标仓库 clone；preflight 按门禁正确阻断，未发起模型请求。
-- 2026-08-20：15 个目标仓库已全部克隆到沙箱，preflight check-only 通过（`ready: true`）；沙箱基础已就绪，可启动真实 CSCD-only 实验。
-- 2026-08-20：真实 CSCD-only 15 任务实验完成（`deepswe_cscd_only_20260820_033158.json`）：
-
-| 指标 | 值 |
-|------|------|
-| 任务完成 | 15/15 |
-| 任务错误 | 0 |
-| 总耗时 | 841.5s (约 14 分钟) |
-| 平均耗时 | 56s/任务 |
-| read | 21 |
-| search | 51 |
-| edit | 0 |
-| write | 0 |
-| run_test | 0 |
-| ship_blocked | 15 |
-| ship | 0 |
-
-结论：沙箱基础设施（Docker 镜像、目标仓库、runtime_root 绑定、preflight 门禁）全部正常工作，模型能正确搜索目标仓库。但 deepseek-v4-flash 在当前 CSCD 配置下未进入 edit/write/run_test 阶段，因此全部 ship_blocked。这不是沙箱或门禁失败，而是模型动作链未完整执行。
-
-## 结语
-
-后续所有推进都应遵循同一条路径：先更新这份文档，再按文档推进实现，最后用测试和持久证据确认结果。推进目标应围绕结构化推理验证：更清晰的证据分类、更完整的引用溯源、更可复核的验证设计和更稳定的审计输出，避免再次把外部工作流控制误称为模型内部推理控制。
+- 它不改变模型内部推理，也不保证结论正确。
 
 历史文档中的“运行时控制”仅表示外部工作流、动作和状态的编排能力，不表示控制模型内部推理。对外定位统一以“结构化推理验证系统”为准。

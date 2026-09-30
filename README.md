@@ -163,6 +163,39 @@ print(r["reason"])
 
 ---
 
+## 输出模式与审计字段
+
+`config.yaml` 的 `prefer_action_plan` 决定模型每轮的输出形态，直接影响四阶协议是否真正执行：
+
+| 值 | 输出形态 | 适用场景 | 审计与缓存 |
+|----|---------|---------|-----------|
+| `false`（默认；MCP 推理网关必须） | C-S-C-D 四阶 XML 标记 | 推理、分析、设计类任务 | 四阶标记真校验；单原子缓存可用（以 `DECOMPOSE` 原子为探针） |
+| `true` | JSON 动作计划 | 代码工程闭环（`execute_action_loop`） | 动作由 Harness 落地文件系统；无四阶原子，缓存不适用 |
+
+> 必须显式配置该项，不要依赖代码默认值。真实端点验证已确认：该值若为 `true`，
+> 运行时状态会要求「不输出 XML 标记」，与 PERSONA 的四阶要求直接冲突，模型会陷入
+> 权衡并把思考过程当正文输出，四阶协议完全不执行，`marks_valid` 也退化为恒 `true` 的伪造值。
+
+审计字段的真实性保证：
+
+- `marks_valid` / `missing_marks`：**始终真校验**。「审计」与「阻断」已解耦——真实模型
+  存在标签漂移，`marks_blocking: false` 只表示不因格式失败而中断交付，不代表跳过校验。
+- 短路路径（`complexity=simple` 且 `rounds=1`）走基线直答，本就不执行四阶，
+  此时 `marks_valid=false` 属正常，请结合 `rounds` 判断，不要一律当作故障。
+- `cache_applicable`：区分「缓存不适用（本轮无四阶原子）」与「适用但未命中」。
+  展示命中率前须先判断此字段，避免把「不适用」报成 0%。
+
+回归测试：
+
+```bash
+python -m pytest tests/ -q
+```
+
+覆盖阶段门禁、checkpoint/rollback、ship 证据、状态机重放、反馈修订上限、
+J-Space 缺失降级与 config 双副本一致性。
+
+---
+
 ## 环境变量
 
 | 变量 | 说明 | 默认值 |
@@ -176,6 +209,15 @@ print(r["reason"])
 | `CSCD_WEBUI_PORT` | WebUI 端口 | 8000 |
 | `CSCD_API_PORT` | REST API 端口 | 8001 |
 | `CSCD_TIMEOUT` | 模型调用超时（秒） | 60 |
+| `CSCD_JSPACE_MODULES_DIR` | J-Space 模块目录（可选） | `tests/j-space/j-space/modules` |
+| `CSCD_LEDGER_DIR` | 运行时账本目录（可选） | `.cscd/ledger` |
+| `CSCD_RUNTIME_DIR` | 运行工作空间目录（可选） | `.cscd` |
+| `CSCD_GATEWAY` | 调用网关开关：`on`/`off`/`auto` | `auto`（按端点是否配置自动判断） |
+
+> **关于 J-Space**：认知控制模块来自独立的第三方套件 J-Space（带自有 LICENSE），
+> 不随本仓库分发。未安装时 CSCD 正常运行，认知控制降级为基础规则，
+> 四阶协议不受影响；返回值中 `missing_modules` 会如实列出未加载的模块。
+> 如需启用，安装后设置 `CSCD_JSPACE_MODULES_DIR` 指向其 `modules` 目录。
 
 ---
 
