@@ -140,8 +140,11 @@ class DefaultActionExecutor:
         bad = sorted({ch for ch in command if ch in forbidden})
         if bad:
             raise ValueError(f"run_test 命令包含危险字符: {' '.join(bad)}")
-        if "(" in command and ")" in command:
-            raise ValueError("run_test 命令包含命令替换")
+        # 命令替换的判据是「$( 或 ` 前置的括号」，不是任意括号——
+        # 合法测试命令本就大量含括号（python -c "print(1)"、pytest -k "test_foo(bar)"）。
+        # $ 与反引号已在上面的危险字符里拦掉，这里只做一次显式提示。
+        if "$((" in command:
+            raise ValueError("run_test 命令包含嵌套命令替换")
         try:
             argv = shlex.split(command, posix=False)
         except ValueError as exc:
